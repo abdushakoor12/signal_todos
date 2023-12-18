@@ -1,8 +1,10 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import 'package:signal_todos/data/database/database.dart';
+import 'package:signal_todos/data/repos/todo_repo.dart';
 import 'package:signals/signals_flutter.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -12,9 +14,20 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Signal Notes',
+      themeMode: ThemeMode.dark,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+      ),
+      darkTheme: ThemeData.dark().copyWith(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        cardColor: Colors.grey[900],
+        listTileTheme: const ListTileThemeData(
+          tileColor: Colors.grey,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.grey,
+        ),
       ),
       debugShowCheckedModeBanner: false,
       home: const HomeScreen(),
@@ -29,12 +42,9 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-final todos = <Todo>[].toSignal();
-final notDoneTodos =
-    computed(() => todos().where((todo) => !todo.isDone).toList());
-
 class _HomeScreenState extends State<HomeScreen> {
   final todoController = TextEditingController();
+  final todosSignal = todoRepo.watchAllTodoItems().toSignal();
 
   @override
   void dispose() {
@@ -44,7 +54,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final doneTodoList = notDoneTodos.watch(context);
+    final todosState = todosSignal.watch(context);
+
+    if (todosState.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final todos = todosState.value ?? [];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Signal Notes'),
@@ -59,67 +80,60 @@ class _HomeScreenState extends State<HomeScreen> {
               value = value.trim();
               if (value.isEmpty) return;
 
-              todos.add(
-                Todo.newTodo(value),
-              );
+              todoRepo.insertTodoItem(TodoItemsCompanion.insert(title: value));
               todoController.clear();
             },
             decoration: const InputDecoration(
-              labelText: 'Note',
+              labelText: 'New Todo...',
+              border: OutlineInputBorder(),
             ),
           ),
         ),
         Expanded(
-            child: ListView.builder(
-          itemCount: doneTodoList.length,
-          itemBuilder: (context, index) {
-            final todo = doneTodoList[index];
-            return ListTile(
-              title: Text(
-                todo.title,
-                style: TextStyle(
-                  decoration: todo.isDone ? TextDecoration.lineThrough : null,
-                ),
-              ),
-              trailing: Checkbox(
-                value: todo.isDone,
-                onChanged: (value) {
-                  todos[index] = todos[index].copyWith(
-                    isDone: value!,
-                  );
-                },
-              ),
-            );
-          },
-        )),
+            child: todos.isEmpty
+                ? const Center(
+                    child: Text('No Todos'),
+                  )
+                : ListView.builder(
+                    itemCount: todos.length,
+                    itemBuilder: (context, index) {
+                      final todo = todos[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
+                        child: ListTile(
+                          title: Text(
+                            todo.title,
+                            style: TextStyle(
+                              decoration: todo.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          onTap: () {
+                            todoRepo.updateTodoItem(
+                              todo.copyWith(isDone: !todo.isDone),
+                            );
+                          },
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () {
+                              todoRepo.deleteTodoItem(todo);
+                            },
+                          ),
+                          leading: Checkbox(
+                            value: todo.isDone,
+                            onChanged: (value) {
+                              todoRepo.updateTodoItem(
+                                todo.copyWith(isDone: value),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  )),
       ]),
     );
   }
-}
-
-class Todo extends Equatable {
-  final String title;
-  final bool isDone;
-
-  const Todo({
-    required this.title,
-    this.isDone = false,
-  });
-
-  static Todo newTodo(String title) => Todo(
-        title: title,
-      );
-
-  Todo copyWith({
-    String? title,
-    bool? isDone,
-  }) {
-    return Todo(
-      title: title ?? this.title,
-      isDone: isDone ?? this.isDone,
-    );
-  }
-
-  @override
-  List<Object?> get props => [title, isDone];
 }
