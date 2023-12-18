@@ -3,7 +3,7 @@
 Testing how [Signals](https://pub.dev/packages/signals) work
 
 ### TODOs
- - [ ] Persist Data with a database
+ - [x] Persist Data with a database
  - [ ] Test StreamSignal and FutureSignal
 
 ### Run build_runner
