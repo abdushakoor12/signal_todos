@@ -12,12 +12,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final todoController = TextEditingController();
   final todosSignal = todoRepo.watchAllTodoItems().toSignal();
 
   @override
   void dispose() {
-    todoController.dispose();
     super.dispose();
   }
 
@@ -55,70 +53,96 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            controller: todoController,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (value) {
-              value = value.trim();
-              if (value.isEmpty) return;
-
-              todoRepo.insertTodoItem(TodoItemsCompanion.insert(title: value));
-              todoController.clear();
-            },
-            decoration: const InputDecoration(
-              labelText: 'New Todo...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ),
-        Expanded(
-            child: todos.isEmpty
-                ? const Center(
-                    child: Text('No Todos'),
-                  )
-                : ListView.builder(
-                    itemCount: todos.length,
-                    itemBuilder: (context, index) {
-                      final todo = todos[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        child: ListTile(
-                          title: Text(
-                            todo.title,
-                            style: TextStyle(
-                              decoration: todo.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                          onTap: () {
-                            todoRepo.updateTodoItem(
-                              todo.copyWith(isDone: !todo.isDone),
-                            );
-                          },
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () {
-                              todoRepo.deleteTodoItem(todo);
-                            },
-                          ),
-                          leading: Checkbox(
-                            value: todo.isDone,
-                            onChanged: (value) {
-                              todoRepo.updateTodoItem(
-                                todo.copyWith(isDone: value),
-                              );
-                            },
-                          ),
-                        ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          showNewTodoModalSheet(context);
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add Todo'),
+      ),
+      body: todos.isEmpty
+          ? const Center(
+              child: Text('No Todos'),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 80),
+              itemCount: todos.length,
+              itemBuilder: (context, index) {
+                final todo = todos[index];
+                return Card(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: ListTile(
+                    title: Text(
+                      todo.title,
+                      style: TextStyle(
+                        decoration:
+                            todo.isDone ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                    onTap: () {
+                      todoRepo.updateTodoItem(
+                        todo.copyWith(isDone: !todo.isDone),
                       );
                     },
-                  )),
-      ]),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () {
+                        todoRepo.deleteTodoItem(todo);
+                      },
+                    ),
+                    leading: Checkbox(
+                      value: todo.isDone,
+                      onChanged: (value) {
+                        todoRepo.updateTodoItem(
+                          todo.copyWith(isDone: value),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
+}
+
+void showNewTodoModalSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) {
+      return Container(
+        color: Theme.of(context).dialogBackgroundColor,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Add Todo',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Todo Text',
+                border: OutlineInputBorder(),
+              ),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (value) {
+                if (value.isEmpty) return;
+                todoRepo
+                    .insertTodoItem(TodoItemsCompanion.insert(title: value));
+
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
